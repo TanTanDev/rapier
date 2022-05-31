@@ -33,6 +33,8 @@ mod fountain3;
 mod heightfield3;
 mod joints3;
 // mod joints3;
+mod convex_voxel_decomposition3;
+mod debug_excentric_boxes3;
 mod keva3;
 mod locked_rotations3;
 mod one_way_platforms3;
@@ -86,6 +88,10 @@ pub fn main() {
         ("Collision groups", collision_groups3::init_world),
         ("Compound", compound3::init_world),
         ("Convex decomposition", convex_decomposition3::init_world),
+        (
+            "Convex voxel decomposition",
+            convex_voxel_decomposition3::init_world,
+        ),
         ("Convex polyhedron", convex_polyhedron3::init_world),
         ("Damping", damping3::init_world),
         ("Domino", domino3::init_world),
@@ -113,6 +119,10 @@ pub fn main() {
         ("(Debug) triangle", debug_triangle3::init_world),
         ("(Debug) trimesh", debug_trimesh3::init_world),
         ("(Debug) cylinder", debug_cylinder3::init_world),
+        (
+            "(Debug) excentric boxes",
+            debug_excentric_boxes3::init_world,
+        ),
         ("(Debug) infinite fall", debug_infinite_fall3::init_world),
         ("(Debug) prismatic", debug_prismatic3::init_world),
         ("(Debug) rollback", debug_rollback3::init_world),

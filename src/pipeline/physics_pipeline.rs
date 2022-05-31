@@ -14,7 +14,7 @@ use crate::geometry::{
     ContactManifoldIndex, NarrowPhase,
 };
 use crate::math::{Real, Vector};
-use crate::pipeline::{EventHandler, PhysicsHooks};
+use crate::pipeline::{EventHandler, PhysicsHooks, PostSolveContext, VoxelFractureHooks};
 use {crate::dynamics::RigidBodySet, crate::geometry::ColliderSet};
 
 /// The physics pipeline, responsible for stepping the whole physics simulation.
@@ -148,6 +148,8 @@ impl PhysicsPipeline {
         colliders: &mut ColliderSet,
         impulse_joints: &mut ImpulseJointSet,
         multibody_joints: &mut MultibodyJointSet,
+        hooks: &dyn PhysicsHooks,
+        events: &dyn EventHandler,
     ) {
         self.counters.stages.island_construction_time.resume();
         islands.update_active_set_with_contacts(
@@ -172,10 +174,12 @@ impl PhysicsPipeline {
         }
 
         let mut manifolds = Vec::new();
+        let mut active_pairs = Vec::new();
         narrow_phase.select_active_contacts(
             islands,
             bodies,
             &mut manifolds,
+            &mut active_pairs,
             &mut self.manifold_indices,
         );
         impulse_joints.select_active_interactions(
@@ -275,6 +279,21 @@ impl PhysicsPipeline {
                     });
             });
         }
+
+        {
+            let mut context = PostSolveContext {
+                integration_parameters,
+                bodies,
+                colliders,
+                islands,
+                narrow_phase: &*narrow_phase,
+                active_pairs: &active_pairs,
+            };
+            // FIXME: don’t hard-code this.
+            let fractures = VoxelFractureHooks::default();
+            fractures.post_solve(&mut context, events);
+        }
+
         self.counters.stages.solver_time.pause();
     }
 
@@ -371,6 +390,16 @@ impl PhysicsPipeline {
         hooks: &dyn PhysicsHooks,
         events: &dyn EventHandler,
     ) {
+        // Apply some of delayed wake-ups.
+        for handle in impulse_joints
+            .to_wake_up
+            .drain(..)
+            .chain(multibody_joints.to_wake_up.drain(..))
+        {
+            islands.wake_up(bodies, handle, true);
+        }
+
+        // Apply modifications.
         let modified_bodies = bodies.take_modified();
         let mut modified_colliders = colliders.take_modified();
         let mut removed_colliders = colliders.take_removed();
@@ -497,11 +526,13 @@ impl PhysicsPipeline {
                 colliders,
                 impulse_joints,
                 multibody_joints,
+                hooks,
+                events,
             );
 
             // If CCD is enabled, execute the CCD motion clamping.
             if ccd_is_enabled {
-                // NOTE: don't the forces into account when updating the CCD active flags because
+                // NOTE: don't take the forces into account when updating the CCD active flags because
                 //       they have already been integrated into the velocities by the solver.
                 let ccd_active = ccd_solver.update_ccd_active_flags(
                     islands,

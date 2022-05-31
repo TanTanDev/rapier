@@ -10,9 +10,10 @@ use bevy::render::render_resource::PrimitiveTopology;
 use rapier::geometry::{ColliderHandle, ColliderSet, Shape, ShapeType};
 #[cfg(feature = "dim3")]
 use rapier::geometry::{Cone, Cylinder};
-use rapier::math::{Isometry, Real, Vector};
+use rapier::math::{Isometry, Point, Real, Vector};
 
 use crate::graphics::BevyMaterial;
+use rapier::prelude::AABB;
 #[cfg(feature = "dim2")]
 use {
     bevy::sprite::MaterialMesh2dBundle,
@@ -485,6 +486,10 @@ fn generate_collider_mesh(co_shape: &dyn Shape) -> Option<Mesh> {
         ShapeType::RoundConvexPolyhedron => {
             let poly = co_shape.as_round_convex_polyhedron().unwrap();
             bevy_mesh(poly.inner_shape.to_trimesh())
+        }
+        ShapeType::Voxels => {
+            let voxels = co_shape.as_voxels().unwrap();
+            bevy_mesh(voxels.to_trimesh())
         }
         _ => return None,
     };

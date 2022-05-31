@@ -86,10 +86,13 @@ type Callbacks =
 #[allow(dead_code)]
 impl Harness {
     pub fn new_empty() -> Self {
-        let event_channel = crossbeam::channel::unbounded();
-        let event_handler = ChannelEventCollector::new(event_channel.0);
+        let collision_event_channel = crossbeam::channel::unbounded();
+        let fracture_event_channel = crossbeam::channel::unbounded();
+        let event_handler =
+            ChannelEventCollector::new(collision_event_channel.0, fracture_event_channel.0);
         let events = PhysicsEvents {
-            events: event_channel.1,
+            collision_events: collision_event_channel.1,
+            fracture_events: fracture_event_channel.1,
         };
         let physics = PhysicsState::new();
         let state = RunState::new();

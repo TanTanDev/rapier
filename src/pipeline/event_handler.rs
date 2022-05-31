@@ -1,14 +1,18 @@
 use crate::dynamics::RigidBodySet;
 use crate::geometry::{ColliderSet, CollisionEvent, ContactPair};
+use crate::pipeline::voxel_fracture_hooks::FractureEvent;
 use crossbeam::channel::Sender;
 
 bitflags::bitflags! {
     #[cfg_attr(feature = "serde-serialize", derive(Serialize, Deserialize))]
     /// Flags affecting the events generated for this collider.
     pub struct ActiveEvents: u32 {
-        /// If set, Rapier will call `EventHandler::handle_intersection_event` and
-        /// `EventHandler::handle_contact_event` whenever relevant for this collider.
+        /// If set, Rapier will call `EventHandler::handle_collision_event` whenever this colliders
+        /// starts or stops colliding with another collider.
         const COLLISION_EVENTS = 0b0001;
+        /// If set, Rapier will call `EventHandler::handle_fracture_event` whenever this colliders
+        /// is fractured.
+        const FRACTURE_EVENTS = 0b0010;
     }
 }
 
@@ -40,6 +44,13 @@ pub trait EventHandler: Send + Sync {
         event: CollisionEvent,
         contact_pair: Option<&ContactPair>,
     );
+
+    fn handle_fracture_event(
+        &self,
+        bodies: &RigidBodySet,
+        colliders: &ColliderSet,
+        event: FractureEvent,
+    );
 }
 
 impl EventHandler for () {
@@ -51,17 +62,32 @@ impl EventHandler for () {
         _contact_pair: Option<&ContactPair>,
     ) {
     }
+
+    fn handle_fracture_event(
+        &self,
+        _bodies: &RigidBodySet,
+        _colliders: &ColliderSet,
+        _event: FractureEvent,
+    ) {
+    }
 }
 
 /// A collision event handler that collects events into a crossbeam channel.
 pub struct ChannelEventCollector {
-    event_sender: Sender<CollisionEvent>,
+    collision_event_sender: Sender<CollisionEvent>,
+    fracture_event_sender: Sender<FractureEvent>,
 }
 
 impl ChannelEventCollector {
     /// Initialize a new collision event handler from crossbeam channel senders.
-    pub fn new(event_sender: Sender<CollisionEvent>) -> Self {
-        Self { event_sender }
+    pub fn new(
+        collision_event_sender: Sender<CollisionEvent>,
+        fracture_event_sender: Sender<FractureEvent>,
+    ) -> Self {
+        Self {
+            collision_event_sender,
+            fracture_event_sender,
+        }
     }
 }
 
@@ -73,6 +99,15 @@ impl EventHandler for ChannelEventCollector {
         event: CollisionEvent,
         _: Option<&ContactPair>,
     ) {
-        let _ = self.event_sender.send(event);
+        let _ = self.collision_event_sender.send(event);
+    }
+
+    fn handle_fracture_event(
+        &self,
+        _bodies: &RigidBodySet,
+        _colliders: &ColliderSet,
+        event: FractureEvent,
+    ) {
+        let _ = self.fracture_event_sender.send(event);
     }
 }

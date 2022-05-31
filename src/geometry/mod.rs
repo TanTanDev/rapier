@@ -49,6 +49,7 @@ pub type PointProjection = parry::query::PointProjection;
 /// The the time of impact between two shapes.
 pub type TOI = parry::query::TOI;
 pub use parry::shape::SharedShape;
+pub use parry::shape::{OctantPattern, VoxelType, Voxels};
 
 bitflags::bitflags! {
     /// Flags providing more information regarding a collision event.

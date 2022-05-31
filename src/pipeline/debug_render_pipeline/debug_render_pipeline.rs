@@ -402,6 +402,7 @@ impl DebugRenderPipeline {
                 let vtx = s.to_polyline(self.style.border_subdivisions);
                 backend.draw_line_strip(object, &vtx, pos, &Vector::repeat(1.0), color, true)
             }
+            TypedShape::Voxels(_) => todo!(),
             TypedShape::Custom(_) => {}
         }
     }
@@ -555,6 +556,9 @@ impl DebugRenderPipeline {
                 let (vtx, idx) = s.to_outline(self.style.border_subdivisions);
                 backend.draw_polyline(object, &vtx, &idx, pos, &Vector::repeat(1.0), color)
             }
+            TypedShape::Voxels(s) => s.iter_outline(|a, b| {
+                backend.draw_line(object, pos * a, pos * b, color);
+            }),
             TypedShape::Custom(_) => {}
         }
     }

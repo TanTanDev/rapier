@@ -1,6 +1,10 @@
-use crate::dynamics::{RigidBodyHandle, RigidBodySet};
-use crate::geometry::{ColliderHandle, ColliderSet, ContactManifold, SolverContact, SolverFlags};
+use crate::dynamics::{IntegrationParameters, IslandManager, RigidBodyHandle, RigidBodySet};
+use crate::geometry::{
+    ColliderHandle, ColliderSet, ContactManifold, ContactPair, NarrowPhase, SolverContact,
+    SolverFlags, TemporaryInteractionIndex,
+};
 use crate::math::{Real, Vector};
+use crate::pipeline::EventHandler;
 use na::ComplexField;
 
 /// Context given to custom collision filters to filter-out collisions.
@@ -43,6 +47,17 @@ pub struct ContactModificationContext<'a> {
     // NOTE: we keep this a &'a mut u32 to emphasize the
     // fact that this can be modified.
     pub user_data: &'a mut u32,
+}
+
+pub struct PostSolveContext<'a> {
+    pub integration_parameters: &'a IntegrationParameters,
+    /// The set of rigid-bodies.
+    pub bodies: &'a mut RigidBodySet,
+    /// The set of colliders.
+    pub colliders: &'a mut ColliderSet,
+    pub islands: &'a mut IslandManager,
+    pub narrow_phase: &'a NarrowPhase,
+    pub active_pairs: &'a [TemporaryInteractionIndex],
 }
 
 impl<'a> ContactModificationContext<'a> {
@@ -125,6 +140,7 @@ bitflags::bitflags! {
         const FILTER_INTERSECTION_PAIR = 0b0010;
         /// If set, Rapier will call `PhysicsHooks::modify_solver_contact` whenever relevant.
         const MODIFY_SOLVER_CONTACTS = 0b0100;
+        const POST_SOLVE = 0b1000;
     }
 }
 impl Default for ActiveHooks {
@@ -152,6 +168,8 @@ pub trait PhysicsHooks {
 
     /// Modifies the set of contacts seen by the constraints solver.
     fn modify_solver_contacts(&self, _context: &mut ContactModificationContext) {}
+
+    fn post_solve(&self, _post_solve_context: PostSolveContext) {}
 }
 
 /// User-defined functions called by the physics engines during one timestep in order to customize its behavior.

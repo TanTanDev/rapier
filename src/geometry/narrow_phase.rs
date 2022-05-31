@@ -1,6 +1,7 @@
 #[cfg(feature = "parallel")]
 use rayon::prelude::*;
 
+use crate::data::graph::EdgeIndex;
 use crate::data::Coarena;
 use crate::dynamics::{
     CoefficientCombineRule, IslandManager, RigidBodyDominance, RigidBodySet, RigidBodyType,
@@ -8,7 +9,7 @@ use crate::dynamics::{
 use crate::geometry::{
     BroadPhasePairEvent, ColliderChanges, ColliderGraphIndex, ColliderHandle, ColliderPair,
     ColliderSet, CollisionEvent, ContactData, ContactManifold, ContactManifoldData, ContactPair,
-    InteractionGraph, IntersectionPair, SolverContact, SolverFlags,
+    InteractionGraph, IntersectionPair, SolverContact, SolverFlags, TemporaryInteractionIndex,
 };
 use crate::math::{Real, Vector};
 use crate::pipeline::{
@@ -162,6 +163,10 @@ impl NarrowPhase {
                     .interactions_with(id)
                     .map(|e| (e.0, e.1, e.2.intersecting))
             })
+    }
+
+    pub fn contact_pair_at_index(&self, id: TemporaryInteractionIndex) -> &ContactPair {
+        &self.contact_graph.graph.edges[id.index()].weight
     }
 
     /// The contact pair involving two specific colliders.
@@ -975,6 +980,7 @@ impl NarrowPhase {
         islands: &IslandManager,
         bodies: &RigidBodySet,
         out_manifolds: &mut Vec<&'a mut ContactManifold>,
+        out_pairs: &mut Vec<TemporaryInteractionIndex>,
         out: &mut Vec<Vec<ContactManifoldIndex>>,
     ) {
         for out_island in &mut out[..islands.num_islands()] {
@@ -982,7 +988,9 @@ impl NarrowPhase {
         }
 
         // TODO: don't iterate through all the interactions.
-        for inter in self.contact_graph.graph.edges.iter_mut() {
+        for (pair_id, inter) in self.contact_graph.graph.edges.iter_mut().enumerate() {
+            let mut pair_pushed = false;
+
             for manifold in &mut inter.weight.manifolds {
                 if manifold
                     .data
@@ -1026,6 +1034,11 @@ impl NarrowPhase {
 
                         out[island_index].push(out_manifolds.len());
                         out_manifolds.push(manifold);
+
+                        if !pair_pushed {
+                            out_pairs.push(EdgeIndex::new(pair_id as u32));
+                            pair_pushed = true;
+                        }
                     }
                 }
             }
